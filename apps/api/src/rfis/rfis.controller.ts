@@ -7,7 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseUUIDPipe,
+
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -37,7 +37,7 @@ export class RfisController {
   @ApiParam({ name: 'projectId', type: String })
   @ApiResponse({ status: 201, description: 'RFI created successfully' })
   create(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('projectId')projectId: string,
     @Body() dto: CreateRfiDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -50,7 +50,7 @@ export class RfisController {
   @ApiQuery({ name: 'status', required: false, description: 'Filter by RFI status' })
   @ApiResponse({ status: 200, description: 'Paginated list of RFIs' })
   findAll(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
+    @Param('projectId')projectId: string,
     @Query() pagination: PaginationDto,
     @Query('status') status: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
@@ -64,8 +64,8 @@ export class RfisController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, description: 'RFI details' })
   findOne(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('projectId')projectId: string,
+    @Param('id')id: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.rfisService.findOne(projectId, id, user);
@@ -77,8 +77,8 @@ export class RfisController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, description: 'RFI updated successfully' })
   update(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('projectId')projectId: string,
+    @Param('id')id: string,
     @Body() dto: UpdateRfiDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -91,8 +91,8 @@ export class RfisController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 201, description: 'Response added to RFI' })
   respond(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('projectId')projectId: string,
+    @Param('id')id: string,
     @Body() dto: RespondRfiDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -105,8 +105,8 @@ export class RfisController {
   @ApiParam({ name: 'id', type: String })
   @ApiResponse({ status: 200, description: 'RFI closed successfully' })
   close(
-    @Param('projectId', ParseUUIDPipe) projectId: string,
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('projectId')projectId: string,
+    @Param('id')id: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.rfisService.close(projectId, id, user);

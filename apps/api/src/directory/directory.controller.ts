@@ -8,7 +8,7 @@ import {
   Body,
   Query,
   UseGuards,
-  ParseUUIDPipe,
+
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -59,7 +59,7 @@ export class DirectoryController {
   @ApiResponse({ status: 200, description: 'Company details with contacts' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   findOneCompany(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.directoryService.findOneCompany(id, user);
@@ -70,7 +70,7 @@ export class DirectoryController {
   @ApiResponse({ status: 200, description: 'Company updated successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   updateCompany(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Body() dto: UpdateCompanyDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -82,7 +82,7 @@ export class DirectoryController {
   @ApiResponse({ status: 200, description: 'Company deleted successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   deleteCompany(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.directoryService.deleteCompany(id, user);
@@ -95,7 +95,7 @@ export class DirectoryController {
   @ApiResponse({ status: 201, description: 'Contact created successfully' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   createContact(
-    @Param('companyId', ParseUUIDPipe) companyId: string,
+    @Param('companyId') companyId: string,
     @Body() dto: CreateContactDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -107,7 +107,7 @@ export class DirectoryController {
   @ApiResponse({ status: 200, description: 'List of contacts' })
   @ApiResponse({ status: 404, description: 'Company not found' })
   findAllContacts(
-    @Param('companyId', ParseUUIDPipe) companyId: string,
+    @Param('companyId') companyId: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.directoryService.findAllContacts(companyId, user);
@@ -118,8 +118,8 @@ export class DirectoryController {
   @ApiResponse({ status: 200, description: 'Contact updated successfully' })
   @ApiResponse({ status: 404, description: 'Company or contact not found' })
   updateContact(
-    @Param('companyId', ParseUUIDPipe) companyId: string,
-    @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Param('companyId') companyId: string,
+    @Param('contactId') contactId: string,
     @Body() dto: UpdateContactDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -131,8 +131,8 @@ export class DirectoryController {
   @ApiResponse({ status: 200, description: 'Contact deleted successfully' })
   @ApiResponse({ status: 404, description: 'Company or contact not found' })
   deleteContact(
-    @Param('companyId', ParseUUIDPipe) companyId: string,
-    @Param('contactId', ParseUUIDPipe) contactId: string,
+    @Param('companyId') companyId: string,
+    @Param('contactId') contactId: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.directoryService.deleteContact(companyId, contactId, user);

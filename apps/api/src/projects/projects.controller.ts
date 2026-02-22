@@ -7,7 +7,7 @@ import {
   Body,
   Query,
   UseGuards,
-  ParseUUIDPipe,
+
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -55,7 +55,7 @@ export class ProjectsController {
   @ApiResponse({ status: 200, description: 'Project details' })
   @ApiResponse({ status: 404, description: 'Project not found' })
   findOne(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id')id: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.projectsService.findOne(id, user);
@@ -66,7 +66,7 @@ export class ProjectsController {
   @ApiResponse({ status: 200, description: 'Project updated successfully' })
   @ApiResponse({ status: 404, description: 'Project not found' })
   update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id')id: string,
     @Body() dto: UpdateProjectDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -79,7 +79,7 @@ export class ProjectsController {
   @ApiResponse({ status: 404, description: 'Project not found' })
   @ApiResponse({ status: 409, description: 'User is already a member' })
   addMember(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id')id: string,
     @Body() dto: AddMemberDto,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
@@ -91,7 +91,7 @@ export class ProjectsController {
   @ApiResponse({ status: 200, description: 'List of project members' })
   @ApiResponse({ status: 404, description: 'Project not found' })
   listMembers(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id')id: string,
     @CurrentUser() user: { id: string; email: string; orgId: string },
   ) {
     return this.projectsService.listMembers(id, user);
