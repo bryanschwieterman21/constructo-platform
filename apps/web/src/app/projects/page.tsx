@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Dialog, DialogHeader, DialogContent, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import { FolderKanban, Plus } from 'lucide-react';
@@ -27,21 +29,83 @@ interface Project {
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    code: '',
+    description: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    startDate: '',
+    endDate: '',
+  });
 
   useEffect(() => {
+    loadProjects();
+  }, []);
+
+  function loadProjects() {
     api
       .get<{ data: Project[] }>('/projects')
       .then((res) => setProjects(res.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  function openDialog() {
+    setForm({ name: '', code: '', description: '', address: '', city: '', state: '', zip: '', startDate: '', endDate: '' });
+    setError('');
+    setDialogOpen(true);
+  }
+
+  function updateField(field: string, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.code.trim()) {
+      setError('Name and Code are required.');
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      const payload: Record<string, string> = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+      };
+      if (form.description.trim()) payload.description = form.description.trim();
+      if (form.address.trim()) payload.address = form.address.trim();
+      if (form.city.trim()) payload.city = form.city.trim();
+      if (form.state.trim()) payload.state = form.state.trim();
+      if (form.zip.trim()) payload.zip = form.zip.trim();
+      if (form.startDate) payload.startDate = form.startDate;
+      if (form.endDate) payload.endDate = form.endDate;
+
+      await api.post('/projects', payload);
+      setDialogOpen(false);
+      setLoading(true);
+      loadProjects();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create project.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <AppShell>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-          <Button>
+          <Button onClick={openDialog}>
             <Plus className="mr-2 h-4 w-4" />
             New Project
           </Button>
@@ -56,7 +120,7 @@ export default function ProjectsPage() {
                 icon={<FolderKanban className="h-12 w-12" />}
                 title="No projects yet"
                 description="Create your first project to start managing construction."
-                action={{ label: 'New Project', onClick: () => {} }}
+                action={{ label: 'New Project', onClick: openDialog }}
               />
             ) : (
               <Table>
@@ -100,6 +164,94 @@ export default function ProjectsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)}>
+        <form onSubmit={handleSubmit}>
+          <DialogHeader onClose={() => setDialogOpen(false)}>Create Project</DialogHeader>
+          <DialogContent className="space-y-4">
+            {error && (
+              <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                id="name"
+                label="Project Name *"
+                placeholder="Downtown Office Tower"
+                value={form.name}
+                onChange={(e) => updateField('name', e.target.value)}
+              />
+              <Input
+                id="code"
+                label="Project Code *"
+                placeholder="PRJ-2026-001"
+                value={form.code}
+                onChange={(e) => updateField('code', e.target.value)}
+              />
+            </div>
+            <Input
+              id="description"
+              label="Description"
+              placeholder="Brief project description"
+              value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
+            />
+            <Input
+              id="address"
+              label="Address"
+              placeholder="123 Main St"
+              value={form.address}
+              onChange={(e) => updateField('address', e.target.value)}
+            />
+            <div className="grid grid-cols-3 gap-4">
+              <Input
+                id="city"
+                label="City"
+                placeholder="Austin"
+                value={form.city}
+                onChange={(e) => updateField('city', e.target.value)}
+              />
+              <Input
+                id="state"
+                label="State"
+                placeholder="TX"
+                value={form.state}
+                onChange={(e) => updateField('state', e.target.value)}
+              />
+              <Input
+                id="zip"
+                label="ZIP"
+                placeholder="78701"
+                value={form.zip}
+                onChange={(e) => updateField('zip', e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                id="startDate"
+                label="Start Date"
+                type="date"
+                value={form.startDate}
+                onChange={(e) => updateField('startDate', e.target.value)}
+              />
+              <Input
+                id="endDate"
+                label="End Date"
+                type="date"
+                value={form.endDate}
+                onChange={(e) => updateField('endDate', e.target.value)}
+              />
+            </div>
+          </DialogContent>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Creating...' : 'Create Project'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
     </AppShell>
   );
 }
