@@ -1,0 +1,719 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// CORE: Organizations, Users, Auth
+// ============================================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  phone     String?
+  website   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  OrgMember[]
+  projects Project[]
+  companies CompanyDirectory[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  firstName      String
+  lastName       String
+  phone          String?
+  avatarUrl      String?
+  isActive       Boolean  @default(true)
+  emailVerified  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orgMemberships    OrgMember[]
+  projectMemberships ProjectMember[]
+
+  // Authored items
+  createdRfis       Rfi[]            @relation("RfiCreator")
+  assignedRfis      Rfi[]            @relation("RfiAssignee")
+  closedRfis        Rfi[]            @relation("RfiCloser")
+  rfiResponses      RfiResponse[]
+  createdSubmittals Submittal[]      @relation("SubmittalCreator")
+  assignedSubmittals Submittal[]     @relation("SubmittalAssignee")
+  closedSubmittals  Submittal[]      @relation("SubmittalCloser")
+  createdSubmittalRevisions SubmittalRevision[]
+  createdDailyLogs  DailyLog[]
+  createdDrawingSets DrawingSet[]
+  uploadedDrawings  DrawingRevision[]
+  createdBudgets    Budget[]
+  createdBudgetItems BudgetLineItem[]
+  createdContracts  Contract[]
+  createdChangeOrders ChangeOrder[]
+  createdInvoices   Invoice[]
+  createdFolders    Folder[]
+  uploadedDocuments  Document[]
+
+  @@map("users")
+}
+
+model OrgMember {
+  id        String   @id @default(cuid())
+  role      OrgRole  @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+  @@map("org_members")
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============================================================
+// PROJECTS
+// ============================================================
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  code        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  address     String?
+  city        String?
+  state       String?
+  zip         String?
+  latitude    Float?
+  longitude   Float?
+  startDate   DateTime?
+  endDate     DateTime?
+  imageUrl    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  members      ProjectMember[]
+  rfis         Rfi[]
+  submittals   Submittal[]
+  dailyLogs    DailyLog[]
+  drawingSets  DrawingSet[]
+  budgets      Budget[]
+  contracts    Contract[]
+  changeOrders ChangeOrder[]
+  invoices     Invoice[]
+  documents    Document[]
+  folders      Folder[]
+
+  // Future: OpenSpace extension
+  floorPlans   FloorPlan[]
+
+  @@unique([orgId, code])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  PLANNING
+  PRE_CONSTRUCTION
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CLOSED
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  role      ProjectRole @default(VIEWER)
+  createdAt DateTime    @default(now())
+
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Optionally linked to a company in the directory
+  companyId String?
+  company   CompanyDirectory? @relation(fields: [companyId], references: [id])
+
+  @@unique([userId, projectId])
+  @@map("project_members")
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  PROJECT_MANAGER
+  FIELD_ENGINEER
+  SUPERINTENDENT
+  SUBCONTRACTOR
+  VIEWER
+}
+
+// ============================================================
+// DIRECTORY: Companies & Contacts
+// ============================================================
+
+model CompanyDirectory {
+  id            String  @id @default(cuid())
+  name          String
+  tradeType     String?
+  address       String?
+  city          String?
+  state         String?
+  zip           String?
+  phone         String?
+  email         String?
+  website       String?
+  licenseNumber String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  contacts       Contact[]
+  projectMembers ProjectMember[]
+  manpowerLogs   ManpowerLog[]
+  contracts      Contract[]
+
+  @@map("company_directory")
+}
+
+model Contact {
+  id        String  @id @default(cuid())
+  firstName String
+  lastName  String
+  title     String?
+  email     String?
+  phone     String?
+  isPrimary Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   CompanyDirectory @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("contacts")
+}
+
+// ============================================================
+// RFIs (Requests for Information)
+// ============================================================
+
+model Rfi {
+  id             String    @id @default(cuid())
+  number         Int
+  subject        String
+  question       String
+  status         RfiStatus @default(DRAFT)
+  priority       Priority  @default(MEDIUM)
+  dueDate        DateTime?
+  closedDate     DateTime?
+  costImpact     Boolean   @default(false)
+  scheduleImpact Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User    @relation("RfiCreator", fields: [createdById], references: [id])
+  assigneeId  String?
+  assignee    User?   @relation("RfiAssignee", fields: [assigneeId], references: [id])
+  closedAt    DateTime?
+  closedById  String?
+  closedBy    User?    @relation("RfiCloser", fields: [closedById], references: [id])
+
+  responses   RfiResponse[]
+  attachments Attachment[]  @relation("RfiAttachments")
+
+  @@unique([projectId, number])
+  @@map("rfis")
+}
+
+enum RfiStatus {
+  DRAFT
+  OPEN
+  RESPONDED
+  CLOSED
+  OVERDUE
+}
+
+model RfiResponse {
+  id        String   @id @default(cuid())
+  body      String
+  createdAt DateTime @default(now())
+
+  rfiId      String
+  rfi        Rfi  @relation(fields: [rfiId], references: [id], onDelete: Cascade)
+  responderId String
+  responder   User @relation(fields: [responderId], references: [id])
+
+  attachments Attachment[] @relation("RfiResponseAttachments")
+
+  @@map("rfi_responses")
+}
+
+// ============================================================
+// SUBMITTALS
+// ============================================================
+
+model Submittal {
+  id              String          @id @default(cuid())
+  number          Int
+  title           String
+  description     String?
+  specSection     String?
+  status          SubmittalStatus @default(DRAFT)
+  dueDate         DateTime?
+  receivedDate    DateTime?
+  returnedDate    DateTime?
+  leadTimeDays    Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User    @relation("SubmittalCreator", fields: [createdById], references: [id])
+  assigneeId      String?
+  assignee        User?   @relation("SubmittalAssignee", fields: [assigneeId], references: [id])
+  currentRevision Int     @default(0)
+  closedAt        DateTime?
+  closedById      String?
+  closedBy        User?   @relation("SubmittalCloser", fields: [closedById], references: [id])
+
+  revisions   SubmittalRevision[]
+  attachments Attachment[] @relation("SubmittalAttachments")
+
+  @@unique([projectId, number])
+  @@map("submittals")
+}
+
+enum SubmittalStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  APPROVED_AS_NOTED
+  REVISE_AND_RESUBMIT
+  REJECTED
+  CLOSED
+}
+
+model SubmittalRevision {
+  id          String   @id @default(cuid())
+  revisionNum Int
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  submittalId String
+  submittal   Submittal @relation(fields: [submittalId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+
+  attachments Attachment[] @relation("SubmittalRevisionAttachments")
+
+  @@unique([submittalId, revisionNum])
+  @@map("submittal_revisions")
+}
+
+// ============================================================
+// DAILY LOGS
+// ============================================================
+
+model DailyLog {
+  id            String           @id @default(cuid())
+  date          DateTime         @db.Date
+  weather       WeatherCondition @default(CLEAR)
+  tempHigh      Int?
+  tempLow       Int?
+  windSpeed     Int?
+  precipitation Float?
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User    @relation(fields: [createdById], references: [id])
+
+  manpowerLogs ManpowerLog[]
+  photos       Attachment[] @relation("DailyLogPhotos")
+
+  @@unique([projectId, date])
+  @@map("daily_logs")
+}
+
+enum WeatherCondition {
+  CLEAR
+  PARTLY_CLOUDY
+  CLOUDY
+  RAIN
+  SNOW
+  WIND
+  STORM
+  FOG
+}
+
+model ManpowerLog {
+  id        String @id @default(cuid())
+  headcount Int
+  hours     Float
+  notes     String?
+
+  dailyLogId String
+  dailyLog   DailyLog @relation(fields: [dailyLogId], references: [id], onDelete: Cascade)
+  companyId  String
+  company    CompanyDirectory @relation(fields: [companyId], references: [id])
+
+  @@unique([dailyLogId, companyId])
+  @@map("manpower_logs")
+}
+
+// ============================================================
+// DRAWINGS MANAGEMENT
+// ============================================================
+
+model DrawingSet {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  issueDate   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User    @relation(fields: [createdById], references: [id])
+
+  drawings Drawing[]
+
+  @@map("drawing_sets")
+}
+
+model Drawing {
+  id           String             @id @default(cuid())
+  number       String
+  title        String
+  discipline   DrawingDiscipline  @default(ARCHITECTURAL)
+  currentRev   String             @default("0")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  drawingSetId String
+  drawingSet   DrawingSet @relation(fields: [drawingSetId], references: [id], onDelete: Cascade)
+
+  revisions DrawingRevision[]
+
+  @@unique([drawingSetId, number])
+  @@map("drawings")
+}
+
+enum DrawingDiscipline {
+  ARCHITECTURAL
+  STRUCTURAL
+  MECHANICAL
+  ELECTRICAL
+  PLUMBING
+  CIVIL
+  LANDSCAPE
+  FIRE_PROTECTION
+  OTHER
+}
+
+model DrawingRevision {
+  id          String   @id @default(cuid())
+  revision    String
+  fileUrl     String
+  fileName    String
+  fileSize    Int
+  notes       String?
+  uploadedAt  DateTime @default(now())
+
+  drawingId    String
+  drawing      Drawing @relation(fields: [drawingId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User    @relation(fields: [uploadedById], references: [id])
+
+  @@unique([drawingId, revision])
+  @@map("drawing_revisions")
+}
+
+// ============================================================
+// FINANCIAL MANAGEMENT
+// ============================================================
+
+model Budget {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User    @relation(fields: [createdById], references: [id])
+
+  lineItems BudgetLineItem[]
+
+  @@map("budgets")
+}
+
+model BudgetLineItem {
+  id           String  @id @default(cuid())
+  costCode     String
+  description  String
+  originalAmount Float
+  revisedAmount  Float?
+  committedCost  Float  @default(0)
+  actualCost     Float  @default(0)
+  projectedCost  Float?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  budgetId    String
+  budget      Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  @@unique([budgetId, costCode])
+  @@map("budget_line_items")
+}
+
+model Contract {
+  id             String       @id @default(cuid())
+  title          String
+  contractNumber String?
+  type           ContractType @default(SUBCONTRACT)
+  amount         Float
+  status         ContractStatus @default(DRAFT)
+  startDate      DateTime?
+  endDate        DateTime?
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  companyId   String?
+  company     CompanyDirectory? @relation(fields: [companyId], references: [id])
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  changeOrders ChangeOrder[]
+  invoices     Invoice[]
+
+  @@map("contracts")
+}
+
+enum ContractType {
+  PRIME
+  SUBCONTRACT
+  PURCHASE_ORDER
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING
+  EXECUTED
+  COMPLETE
+  TERMINATED
+}
+
+model ChangeOrder {
+  id          String            @id @default(cuid())
+  number      Int
+  title       String
+  description String?
+  amount      Float
+  status      ChangeOrderStatus @default(DRAFT)
+  dueDate     DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contractId  String?
+  contract    Contract? @relation(fields: [contractId], references: [id])
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  attachments Attachment[] @relation("ChangeOrderAttachments")
+
+  @@unique([projectId, number])
+  @@map("change_orders")
+}
+
+enum ChangeOrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  VOID
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String
+  amount        Float
+  status        InvoiceStatus @default(DRAFT)
+  periodStart   DateTime?
+  periodEnd     DateTime?
+  dueDate       DateTime?
+  paidDate      DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  attachments Attachment[] @relation("InvoiceAttachments")
+
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  REJECTED
+  VOID
+}
+
+// ============================================================
+// DOCUMENT MANAGEMENT
+// ============================================================
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Folder?  @relation("FolderTree", fields: [parentId], references: [id])
+  children    Folder[] @relation("FolderTree")
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  documents Document[]
+
+  @@map("folders")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileUrl     String
+  fileSize    Int
+  mimeType    String
+  description String?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projectId    String
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folderId     String?
+  folder       Folder?  @relation(fields: [folderId], references: [id])
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+
+  @@map("documents")
+}
+
+// ============================================================
+// SHARED: Attachments, Priority
+// ============================================================
+
+model Attachment {
+  id        String   @id @default(cuid())
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  // Polymorphic relations
+  rfiId                 String?
+  rfi                   Rfi?               @relation("RfiAttachments", fields: [rfiId], references: [id], onDelete: Cascade)
+  rfiResponseId         String?
+  rfiResponse           RfiResponse?       @relation("RfiResponseAttachments", fields: [rfiResponseId], references: [id], onDelete: Cascade)
+  submittalId           String?
+  submittal             Submittal?         @relation("SubmittalAttachments", fields: [submittalId], references: [id], onDelete: Cascade)
+  submittalRevisionId   String?
+  submittalRevision     SubmittalRevision? @relation("SubmittalRevisionAttachments", fields: [submittalRevisionId], references: [id], onDelete: Cascade)
+  dailyLogId            String?
+  dailyLog              DailyLog?          @relation("DailyLogPhotos", fields: [dailyLogId], references: [id], onDelete: Cascade)
+  changeOrderId         String?
+  changeOrder           ChangeOrder?       @relation("ChangeOrderAttachments", fields: [changeOrderId], references: [id], onDelete: Cascade)
+  invoiceId             String?
+  invoice               Invoice?           @relation("InvoiceAttachments", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ============================================================
+// FUTURE: OpenSpace / Spatial Extension (placeholder)
+// ============================================================
+
+model FloorPlan {
+  id        String   @id @default(cuid())
+  name      String
+  floor     Int      @default(1)
+  imageUrl  String
+  width     Float?
+  height    Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Future: capturePoints CapturePoint[]
+
+  @@map("floor_plans")
+}
